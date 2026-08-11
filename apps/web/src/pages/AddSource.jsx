@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { Alert, Button, Card, Field, Spinner, inputClass } from '../components/ui.jsx';
 
 const initial = {
   name: '',
@@ -11,10 +12,6 @@ const initial = {
   password: '',
   sslMode: 'require',
 };
-
-const fieldClass =
-  'w-full px-3 py-2 rounded-md bg-slate-900 border border-slate-700 focus:border-indigo-500 ' +
-  'focus:outline-none text-sm text-slate-200 placeholder:text-slate-600';
 
 export default function AddSource() {
   const [form, setForm] = useState(initial);
@@ -41,63 +38,106 @@ export default function AddSource() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
-      <h1 className="text-xl font-semibold text-slate-100 mb-1">Connect a database</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        The connection is tested before anything is saved. Credentials are encrypted at rest.
-        Use a read-only database user if you have one.
-      </p>
+    <div className="max-w-[500px] mx-auto animate-rise">
+      <div className="mb-6 pb-4 border-b border-ink-900">
+        <Link
+          to="/sources"
+          className="inline-flex items-center gap-1 text-[12px] text-ink-500 hover:text-ink-300 transition-colors mb-2"
+        >
+          ← Back to sources
+        </Link>
+        <h1 className="text-xl font-medium tracking-tight text-ink-100">
+          Add Connection
+        </h1>
+      </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-md border border-red-800 bg-red-950/50 text-red-300 text-sm">
-          {error}
+        <div className="mb-6">
+          <Alert tone="error">{error}</Alert>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Display name</label>
-          <input required className={fieldClass} placeholder="Demo store" value={form.name} onChange={set('name')} />
-        </div>
-        <div className="grid grid-cols-3 gap-3">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Field label="Name">
+          <input
+            required
+            className={inputClass}
+            placeholder="Production DB"
+            value={form.name}
+            onChange={set('name')}
+          />
+        </Field>
+
+        <div className="grid grid-cols-3 gap-4">
           <div className="col-span-2">
-            <label className="block text-xs text-slate-400 mb-1">Host</label>
-            <input required className={fieldClass} placeholder="aws-0-ap-south-1.pooler.supabase.com" value={form.host} onChange={set('host')} />
+            <Field label="Host">
+              <input
+                required
+                className={inputClass}
+                placeholder="db.example.com"
+                value={form.host}
+                onChange={set('host')}
+              />
+            </Field>
           </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Port</label>
-            <input required type="number" className={fieldClass} value={form.port} onChange={set('port')} />
-          </div>
+          <Field label="Port">
+            <input
+              required
+              type="number"
+              className={inputClass}
+              value={form.port}
+              onChange={set('port')}
+            />
+          </Field>
         </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Database</label>
-          <input required className={fieldClass} placeholder="postgres" value={form.database} onChange={set('database')} />
+
+        <Field label="Database">
+          <input
+            required
+            className={inputClass}
+            placeholder="postgres"
+            value={form.database}
+            onChange={set('database')}
+          />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Username">
+            <input
+              required
+              className={inputClass}
+              placeholder="readonly_user"
+              value={form.username}
+              onChange={set('username')}
+            />
+          </Field>
+          <Field label="Password">
+            <input
+              required
+              type="password"
+              className={inputClass}
+              placeholder="••••••••"
+              value={form.password}
+              onChange={set('password')}
+            />
+          </Field>
         </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Username</label>
-          <input required className={fieldClass} placeholder="querylens_ro.<project-ref>" value={form.username} onChange={set('username')} />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Password</label>
-          <input required type="password" className={fieldClass} value={form.password} onChange={set('password')} />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">SSL</label>
-          <select className={fieldClass} value={form.sslMode} onChange={set('sslMode')}>
-            <option value="require">require (hosted databases)</option>
-            <option value="disable">disable (local only)</option>
+
+        <Field label="SSL">
+          <select className={inputClass} value={form.sslMode} onChange={set('sslMode')}>
+            <option value="require">Require</option>
+            <option value="disable">Disable</option>
           </select>
-        </div>
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium disabled:opacity-50"
-          >
-            {busy ? 'Testing connection…' : 'Test & save'}
-          </button>
-          <Link to="/sources" className="text-sm text-slate-500 hover:text-slate-300">
-            Cancel
+        </Field>
+
+        <div className="pt-4 flex items-center gap-3">
+          <Button type="submit" size="md" disabled={busy}>
+            {busy ? 'Testing…' : 'Save Connection'}
+          </Button>
+          <Link to="/sources">
+            <Button type="button" variant="ghost" size="md">
+              Cancel
+            </Button>
           </Link>
         </div>
       </form>

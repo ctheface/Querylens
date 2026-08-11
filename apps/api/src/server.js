@@ -6,6 +6,7 @@ import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
 import dataSourcesRouter from './routes/dataSources.js';
 import askRouter from './routes/ask.js';
+import demoRouter from './routes/demo.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 assertServerConfig();
@@ -18,6 +19,7 @@ app.use(cookieParser());
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/data-sources', dataSourcesRouter);
+app.use('/api/demo', demoRouter);
 app.use('/api', askRouter);
 
 app.use(errorHandler);

@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
+import { SectionLabel } from './ui.jsx';
 
 function isNumeric(value) {
   if (value === null || value === undefined || value === '') return false;
@@ -15,7 +16,6 @@ function isNumeric(value) {
 
 /**
  * Picks a label column (first non-numeric) and a value column (first numeric).
- * Postgres returns NUMERIC/BIGINT as strings over JSON, so values are coerced.
  */
 export function chartableShape(columns, rows) {
   if (columns.length < 2 || rows.length < 2 || rows.length > 50) return null;
@@ -38,27 +38,44 @@ export default function ResultChart({ columns, rows }) {
   }));
 
   return (
-    <div className="border border-slate-800 rounded-lg bg-slate-900/50 p-4 mt-4">
-      <div className="text-xs text-slate-500 mb-2">
-        {shape.valueCol} by {shape.labelCol}
+    <div className="border border-ink-800 rounded p-6 mb-8 bg-ink-950/30">
+      <div className="mb-6">
+        <SectionLabel>
+          {shape.valueCol} / {shape.labelCol}
+        </SectionLabel>
       </div>
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-800)" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            tick={{ fill: 'var(--ink-400)', fontSize: 11, fontFamily: 'JetBrains Mono' }}
+            axisLine={{ stroke: 'var(--ink-800)' }}
+            tickLine={false}
             interval={0}
             angle={data.length > 8 ? -30 : 0}
             textAnchor={data.length > 8 ? 'end' : 'middle'}
-            height={data.length > 8 ? 70 : 30}
+            height={data.length > 8 ? 60 : 30}
           />
-          <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} width={80} />
+          <YAxis
+            tick={{ fill: 'var(--ink-400)', fontSize: 11, fontFamily: 'JetBrains Mono' }}
+            axisLine={false}
+            tickLine={false}
+            width={60}
+          />
           <Tooltip
-            contentStyle={{ background: '#0f172a', border: '1px solid #334155', fontSize: 12 }}
-            labelStyle={{ color: '#e2e8f0' }}
+            cursor={{ fill: 'var(--ink-800)' }}
+            contentStyle={{
+              background: 'var(--ink-950)',
+              border: '1px solid var(--ink-800)',
+              borderRadius: 4,
+              fontSize: 12,
+              fontFamily: 'JetBrains Mono'
+            }}
+            labelStyle={{ color: 'var(--ink-100)', marginBottom: 4 }}
+            itemStyle={{ color: 'var(--ink-200)' }}
           />
-          <Bar dataKey="value" fill="#6366f1" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="value" fill="var(--ink-200)" maxBarSize={40} />
         </BarChart>
       </ResponsiveContainer>
     </div>

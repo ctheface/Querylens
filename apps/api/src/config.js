@@ -13,6 +13,8 @@ export const config = {
   demoRoPassword: process.env.DEMO_RO_PASSWORD,
   encryptionKey: process.env.ENCRYPTION_KEY,
   redisUrl: process.env.REDIS_URL,
+  // Data source served by the public no-login demo (/api/demo). Unset = demo off.
+  demoDataSourceId: Number.parseInt(process.env.DEMO_DATA_SOURCE_ID ?? '', 10) || null,
   auth: {
     jwtSecret: process.env.JWT_SECRET,
     accessTokenTtl: process.env.ACCESS_TOKEN_TTL ?? '15m',

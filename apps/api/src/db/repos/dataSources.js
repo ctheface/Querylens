@@ -23,6 +23,16 @@ export async function getDataSourceWithSecrets(id, userId) {
   return rows[0] ?? null;
 }
 
+/**
+ * Owner-agnostic lookup used ONLY by the public demo route, where the target
+ * data source is pinned by DEMO_DATA_SOURCE_ID in the environment — never by
+ * caller-supplied input.
+ */
+export async function getDataSourceByIdUnscoped(id) {
+  const { rows } = await query('SELECT * FROM data_sources WHERE id = $1', [id]);
+  return rows[0] ?? null;
+}
+
 export async function insertDataSource(ds) {
   const { rows } = await query(
     `INSERT INTO data_sources

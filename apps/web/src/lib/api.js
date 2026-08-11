@@ -64,4 +64,10 @@ export const api = {
   getSchema: (id) => request(`/api/data-sources/${id}/schema`),
   ask: (body) => request('/api/ask', { method: 'POST', body: JSON.stringify(body) }),
   run: (body) => request('/api/run', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Public demo (no auth, no refresh retry).
+  demoStatus: () => rawRequest('/api/demo/status'),
+  demoSchema: () => rawRequest('/api/demo/schema'),
+  demoAsk: (body) => rawRequest('/api/demo/ask', { method: 'POST', body: JSON.stringify(body) }),
+  demoRun: (body) => rawRequest('/api/demo/run', { method: 'POST', body: JSON.stringify(body) }),
 };

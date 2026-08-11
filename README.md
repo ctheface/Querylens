@@ -48,12 +48,14 @@ Hand-edited SQL (`POST /api/run`) goes through the exact same guard — safety i
 
 Requires Node 22+, two free [Supabase](https://supabase.com) projects, and a free [Redis Cloud](https://redis.io/try-free) database.
 
-### 1. Create the Supabase projects
+### 1. Create the Supabase projects (or any Postgres)
 
-- `querylens-app` — the application's own database (users, data sources, messages, schema snapshots)
-- `querylens-demo` — stands in for a customer database
+This repo’s default setup uses two free Supabase projects for convenience — they are **not** required for the databases you query through the UI:
 
-For each, copy the **Session pooler** connection string (Connect → Session pooler, port 5432). Do not use the direct `db.<ref>.supabase.co` host — it is IPv6-only on the free tier and fails on most home networks.
+- `querylens-app` — the application's own database (users, data sources, messages, schema snapshots). Any Postgres URL works in `APP_DATABASE_URL`.
+- `querylens-demo` — optional sample customer DB for `npm run seed:demo`. Skip this if you’ll only connect your own Postgres.
+
+For Supabase, copy the **Session pooler** connection string (Connect → Session pooler, port 5432). Do not use the direct `db.<ref>.supabase.co` host — it is IPv6-only on the free tier and fails on most home networks.
 
 Then create a free 30MB Redis Cloud database (the default includes the query engine needed for vector search) and copy its public endpoint and `default` user password.
 
@@ -81,6 +83,7 @@ Fill in:
 | `GOOGLE_REDIRECT_URI` | Default `http://localhost:4000/api/auth/google/callback` |
 | `WEB_ORIGIN` | Default `http://localhost:5173` (post-OAuth redirect target) |
 | `EMBEDDING_MODEL` / `SEMCACHE_MAX_DISTANCE` | Semantic cache tuning |
+| `DEMO_DATA_SOURCE_ID` | Optional. Data source id served by the public no-login demo at `/demo` |
 | `PORT` | API port (default `4000`) |
 
 **Google OAuth (optional)** — in the Cloud Console Web client set:
@@ -99,9 +102,32 @@ npm run seed:demo    # creates + fills the e-commerce demo schema in querylens-d
 npm run dev          # API on :4000, web on :5173
 ```
 
-### 4. Create an account and register the demo database
+### 4. Create an account
 
-Open http://localhost:5173 — you’ll land on **Register** / **Login** (or **Continue with Google** if configured). The first account automatically adopts any data sources created before auth existed. Then click **Connect a database** and enter:
+Open http://localhost:5173 — you’ll land on **Register** / **Login** (or **Continue with Google** if configured). The first account automatically adopts any data sources created before auth existed.
+
+## Connect your PostgreSQL database
+
+**Your data database does not have to be on Supabase.** QueryLens connects to any reachable Postgres (Neon, RDS, Railway, a VPS, Docker on localhost, Supabase, etc.) via host / port / database / user / password.
+
+1. Sign in → **Data sources** → **Add Connection** (or **Connect a database**).
+2. Fill in:
+   - **Host**, **Port** (usually `5432`), **Database**
+   - **Username** / **Password**
+   - **SSL**: `require` for most hosted DBs; `disable` for local Postgres on the same machine as the API
+3. Save — the API **tests** the connection first, then encrypts credentials at rest (AES-256-GCM).
+4. Click **Refresh** to introspect the schema (tables + columns).
+5. Open **Query** and ask in plain English.
+
+### Recommendations
+
+- Prefer a **read-only** Postgres role (`SELECT` only). QueryLens also runs every query inside `BEGIN READ ONLY` with a statement timeout, but a RO user is still the best last line of defense.
+- The **API process** must be able to reach the host (cloud firewall / IP allowlist). Localhost DBs only work when the API runs on that same machine (`npm run dev` does).
+- For providers that expose both a direct host and a pooler, use whichever is reachable from your network (on Supabase free tier, prefer the **session pooler**).
+
+### Optional: wire up the seeded demo DB
+
+If you ran `npm run seed:demo` against `querylens-demo`, connect with:
 
 - Host / port / database: from the `querylens-demo` session-pooler string
 - Username: `querylens_ro.<project-ref>` (pooler usernames are `role.project-ref`)
@@ -109,7 +135,16 @@ Open http://localhost:5173 — you’ll land on **Register** / **Login** (or **C
 
 Then ask something like *"top 5 products by revenue"*.
 
-> If the `querylens_ro` login is rejected by the pooler, connect with the `postgres.<project-ref>` admin user as a temporary fallback — the read-only transaction still prevents writes — and prefer fixing the role login when possible, since the dedicated role is the last line of defense.
+> If the `querylens_ro` login is rejected by the pooler, connect with the `postgres.<project-ref>` admin user as a temporary fallback — the read-only transaction still prevents writes — and prefer fixing the role login when possible.
+
+## Public demo mode (no login)
+
+Visitors can try QueryLens against the seeded demo database without an account at **`/demo`**.
+
+- Enable it by setting `DEMO_DATA_SOURCE_ID` in `.env` to the id of a `data_sources` row (the seeded demo DB is usually id `1`). Leave it unset to disable the demo entirely.
+- The demo path (`/api/demo/*`) applies the exact same safety pipeline as authenticated queries — sqlguard AST validation, `BEGIN READ ONLY`, statement timeout, read-only DB role — plus a stricter per-IP rate limit (6 questions/min).
+- Demo questions share one semantic cache under a `demo` tag, so common questions cost zero LLM calls.
+- Demo activity is logged to `messages` with a `NULL` user id.
 
 ## Scripts
 

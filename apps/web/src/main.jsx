@@ -8,13 +8,23 @@ import Register from './pages/Register.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import Sources from './pages/Sources.jsx';
 import AddSource from './pages/AddSource.jsx';
+import Landing from './pages/Landing.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
+
 import Ask from './pages/Ask.jsx';
 import './index.css';
 
 function Protected({ children }) {
   const { user, initializing } = useAuth();
   if (initializing) {
-    return <p className="text-center text-slate-500 mt-24">Loading…</p>;
+    return (
+      <div className="flex items-center justify-center py-32 text-ink-500">
+        <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20" />
+          <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      </div>
+    );
   }
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -24,20 +34,23 @@ function Protected({ children }) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route element={<App />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/" element={<Navigate to="/sources" replace />} />
-            <Route path="/sources" element={<Protected><Sources /></Protected>} />
-            <Route path="/sources/new" element={<Protected><AddSource /></Protected>} />
-            <Route path="/ask/:dataSourceId" element={<Protected><Ask /></Protected>} />
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<App />}>
+              <Route path="/" element={<Landing />} />
+              <Route path="/demo" element={<Ask demo />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/sources" element={<Protected><Sources /></Protected>} />
+              <Route path="/sources/new" element={<Protected><AddSource /></Protected>} />
+              <Route path="/ask/:dataSourceId" element={<Protected><Ask /></Protected>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   </React.StrictMode>
 );

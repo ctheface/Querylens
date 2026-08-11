@@ -17,6 +17,7 @@ export const keys = {
 
   // Sliding-window rate limits.
   rateAsk: (userId) => `rl:ask:${userId}`,
+  rateDemo: (ip) => `rl:demo:${ip}`,
 
   // Semantic cache entries (hashes carrying the embedding vector).
   SEMCACHE_PREFIX: 'semcache:',
