@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ApiError } from '../lib/errors.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 import { encryptSecret } from '../lib/crypto.js';
 import { buildClientConfig } from '../services/connector/clientConfig.js';
 import { testConnection } from '../services/connector/testConnection.js';
@@ -14,6 +15,7 @@ import {
 import { latestSnapshot } from '../db/repos/snapshots.js';
 
 const router = Router();
+router.use(requireAuth);
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -25,12 +27,12 @@ const createSchema = z.object({
   sslMode: z.enum(['require', 'disable']).default('require'),
 });
 
-async function loadDataSource(id) {
+async function loadDataSource(id, userId) {
   const numericId = Number.parseInt(id, 10);
   if (!Number.isInteger(numericId)) {
     throw new ApiError(400, 'E_VALIDATION', 'Invalid data source id');
   }
-  const ds = await getDataSourceWithSecrets(numericId);
+  const ds = await getDataSourceWithSecrets(numericId, userId);
   if (!ds) {
     throw new ApiError(404, 'E_NOT_FOUND', 'Data source not found');
   }
@@ -38,7 +40,7 @@ async function loadDataSource(id) {
 }
 
 router.get('/', async (req, res) => {
-  res.json(await listDataSources());
+  res.json(await listDataSources(req.user.id));
 });
 
 router.post('/', async (req, res) => {
@@ -63,6 +65,7 @@ router.post('/', async (req, res) => {
 
   const encrypted = encryptSecret(input.password);
   const created = await insertDataSource({
+    userId: req.user.id,
     name: input.name,
     host: input.host,
     port: input.port,
@@ -77,7 +80,7 @@ router.post('/', async (req, res) => {
   // Best-effort initial introspection so the source is queryable immediately.
   let introspected = false;
   try {
-    const ds = await getDataSourceWithSecrets(created.id);
+    const ds = await getDataSourceWithSecrets(created.id, req.user.id);
     await introspectAndStore(ds);
     introspected = true;
   } catch (err) {
@@ -88,7 +91,7 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/:id/introspect', async (req, res) => {
-  const ds = await loadDataSource(req.params.id);
+  const ds = await loadDataSource(req.params.id, req.user.id);
   try {
     const snapshot = await introspectAndStore(ds);
     res.json({
@@ -103,7 +106,7 @@ router.post('/:id/introspect', async (req, res) => {
 });
 
 router.get('/:id/schema', async (req, res) => {
-  const ds = await loadDataSource(req.params.id);
+  const ds = await loadDataSource(req.params.id, req.user.id);
   const snapshot = await latestSnapshot(ds.id);
   if (!snapshot) {
     throw new ApiError(404, 'E_NO_SNAPSHOT', 'No schema snapshot yet - run introspection first.');
@@ -118,8 +121,8 @@ router.get('/:id/schema', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  const ds = await loadDataSource(req.params.id);
-  await deleteDataSource(ds.id);
+  const ds = await loadDataSource(req.params.id, req.user.id);
+  await deleteDataSource(ds.id, req.user.id);
   res.status(204).end();
 });
 

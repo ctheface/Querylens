@@ -128,6 +128,16 @@ export default function Ask() {
           </div>
         )}
 
+        {result?.cache?.hit && (
+          <div className="mb-4 p-2.5 rounded-md border border-emerald-900 bg-emerald-950/40 text-xs text-emerald-300">
+            ⚡ Answered from cache
+            {result.cache.exact
+              ? ' (same question asked before)'
+              : ` — ${Math.round(result.cache.similarity * 100)}% similar to "${result.cache.matchedQuestion}"`}
+            . No LLM call was made.
+          </div>
+        )}
+
         {sqlText && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
