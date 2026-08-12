@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://RENDER-URL-GOES-HERE.onrender.com/api/:path*"
+      "destination": "https://querylens-8wls.onrender.com/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
