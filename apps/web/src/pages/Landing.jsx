@@ -43,6 +43,27 @@ export default function Landing() {
             View source on GitHub →
           </a>
         </p>
+        <div className="mt-8 inline-flex items-start gap-2.5 rounded-md border border-ink-800 bg-ink-900/40 px-4 py-3 text-left max-w-md mx-auto">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            className="shrink-0 mt-0.5 text-ink-500"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
+          </svg>
+          <p className="text-[12px] text-ink-400 leading-relaxed">
+            The backend runs on Render's free tier and sleeps after 15 minutes of
+            inactivity. If the site feels unresponsive, give it 2–3 minutes to wake
+            up and try again.
+          </p>
+        </div>
       </div>
 
       {/* Mock Terminal Graphic */}
