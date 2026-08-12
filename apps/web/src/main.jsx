@@ -10,6 +10,8 @@ import Sources from './pages/Sources.jsx';
 import AddSource from './pages/AddSource.jsx';
 import Landing from './pages/Landing.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 import Ask from './pages/Ask.jsx';
 import './index.css';
@@ -51,6 +53,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           </Routes>
         </AuthProvider>
       </BrowserRouter>
+      <Analytics />
+      <SpeedInsights />
     </ThemeProvider>
   </React.StrictMode>
 );
