@@ -85,12 +85,13 @@ export default function Ask({ demo = false }) {
     }
   }
 
-  // Auto-resize textarea
+  // Auto-resize textarea; allow scrolling once the 200px cap is reached.
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.max(52, textareaRef.current.scrollHeight)}px`;
-    }
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(200, Math.max(52, el.scrollHeight))}px`;
+    el.style.overflowY = el.scrollHeight > 200 ? 'auto' : 'hidden';
   }, [question]);
 
   if (schemaError) {
@@ -112,7 +113,7 @@ export default function Ask({ demo = false }) {
       {schema ? (
         <SchemaSidebar tables={schema.tables} />
       ) : (
-        <div className="w-64 shrink-0 h-96 rounded bg-ink-900/30 animate-pulse" />
+        <div className="hidden lg:block w-64 shrink-0 h-96 rounded bg-ink-900/30 animate-pulse" />
       )}
 
       <div className="flex-1 min-w-0 flex flex-col pb-32">
@@ -199,7 +200,7 @@ export default function Ask({ demo = false }) {
                   disabled={busy}
                   className="text-[11px] text-ink-100 font-medium hover:underline disabled:opacity-50"
                 >
-                  {busy ? 'Running…' : 'Run Edit'}
+                  {busy ? 'Running…' : 'Run'}
                 </button>
               </div>
             </div>
@@ -227,7 +228,7 @@ export default function Ask({ demo = false }) {
         )}
         
         {/* Floating Input Area (Cursor/ChatGPT style) */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-ink-950/80 backdrop-blur-md border-t border-ink-900 pointer-events-none flex justify-center">
+        <div className="fixed bottom-0 left-0 right-0 z-10 p-4 pb-6 bg-ink-950/80 backdrop-blur-md border-t border-ink-900 pointer-events-none flex justify-center">
           <div className="w-full max-w-3xl pointer-events-auto">
             {!result && !sqlText && !busy && schema && (
             <div className="flex gap-2 mb-3 overflow-x-auto justify-center px-4 no-scrollbar max-w-full">
@@ -252,7 +253,7 @@ export default function Ask({ demo = false }) {
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask anything..."
-                className="w-full pl-5 pr-14 py-4 rounded-xl bg-ink-900 border border-ink-700 text-[14px] text-ink-100 placeholder:text-ink-500 focus:border-ink-500 focus:outline-none resize-none overflow-hidden"
+                className="w-full pl-5 pr-14 py-4 rounded-xl bg-ink-900 border border-ink-700 text-[14px] text-ink-100 placeholder:text-ink-500 focus:border-ink-500 focus:outline-none resize-none"
                 style={{ minHeight: '52px', maxHeight: '200px' }}
               />
               <button 

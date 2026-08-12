@@ -14,6 +14,10 @@ function isNumeric(value) {
   return Number.isFinite(Number(value));
 }
 
+// 60000000 → "60M" so wide values don't overflow the axis gutter.
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+const full = new Intl.NumberFormat('en');
+
 /**
  * Picks a label column (first non-numeric) and a value column (first numeric).
  */
@@ -21,9 +25,13 @@ export function chartableShape(columns, rows) {
   if (columns.length < 2 || rows.length < 2 || rows.length > 50) return null;
   const sample = rows.slice(0, 10);
   const labelCol = columns.find((c) => sample.every((r) => !isNumeric(r[c])));
-  const valueCol = columns.find(
+  const numericCols = columns.filter(
     (c) => c !== labelCol && sample.every((r) => r[c] === null || isNumeric(r[c]))
   );
+  // Prefer a measure over identifiers: "SELECT id, name, revenue" should
+  // chart revenue, not id.
+  const idLike = (c) => /^id$|_id$|^#/i.test(c);
+  const valueCol = numericCols.find((c) => !idLike(c)) ?? numericCols[0];
   if (!labelCol || !valueCol) return null;
   return { labelCol, valueCol };
 }
@@ -62,6 +70,7 @@ export default function ResultChart({ columns, rows }) {
             axisLine={false}
             tickLine={false}
             width={60}
+            tickFormatter={(v) => compact.format(v)}
           />
           <Tooltip
             cursor={{ fill: 'var(--ink-800)' }}
@@ -74,6 +83,7 @@ export default function ResultChart({ columns, rows }) {
             }}
             labelStyle={{ color: 'var(--ink-100)', marginBottom: 4 }}
             itemStyle={{ color: 'var(--ink-200)' }}
+            formatter={(v) => full.format(v)}
           />
           <Bar dataKey="value" fill="var(--ink-200)" maxBarSize={40} />
         </BarChart>

@@ -5,14 +5,23 @@ import { Logo, Wordmark } from './components/ui.jsx';
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  
+
+  // `theme` can be 'system' — resolve what is actually on screen so the
+  // toggle always flips the visible theme (and shows the right icon).
+  const effective =
+    theme === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : theme;
+
   return (
     <button
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      onClick={() => setTheme(effective === 'dark' ? 'light' : 'dark')}
       className="p-1.5 text-ink-500 hover:text-ink-200 transition-colors"
       aria-label="Toggle theme"
     >
-      {theme === 'dark' ? (
+      {effective === 'dark' ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="5"/>
           <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>
@@ -32,6 +41,9 @@ export default function App() {
   const location = useLocation();
 
   const isLanding = location.pathname === '/';
+  // Pages with the fixed bottom composer — the footer would sit behind it.
+  const hasComposer =
+    location.pathname.startsWith('/ask/') || location.pathname === '/demo';
 
   async function handleLogout() {
     await logout();
@@ -94,12 +106,14 @@ export default function App() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-ink-900 mt-auto">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between text-[12px] text-ink-600">
-          <span>QueryLens</span>
-          <span>Queries execute in read-only mode</span>
-        </div>
-      </footer>
+      {!hasComposer && (
+        <footer className="border-t border-ink-900 mt-auto">
+          <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between text-[12px] text-ink-600">
+            <span>QueryLens</span>
+            <span>Queries execute in read-only mode</span>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

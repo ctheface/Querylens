@@ -100,7 +100,7 @@ export default function Landing() {
             </div>
             <h3 className="text-[15px] font-medium text-ink-100 mb-2">Secure & Read-Only</h3>
             <p className="text-[13px] text-ink-400 leading-relaxed">
-               Every query runs through a strict AST validator (`libpg-query`) and executes inside a timed, `READ ONLY` transaction block.
+               Every query runs through a strict AST validator (<code className="font-mono text-ink-300">libpg-query</code>) and executes inside a timed, <code className="font-mono text-ink-300">READ ONLY</code> transaction block.
             </p>
          </div>
          <div>

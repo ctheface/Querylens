@@ -25,7 +25,7 @@ export default function SchemaSidebar({ tables }) {
   }
 
   return (
-    <aside className="w-64 shrink-0 self-start h-[calc(100vh-120px)] flex flex-col border-r border-ink-900 pr-6">
+    <aside className="hidden lg:flex w-64 shrink-0 self-start sticky top-[72px] h-[calc(100vh-120px)] flex-col border-r border-ink-900 pr-6">
       <div className="mb-4">
         <SectionLabel>Schema</SectionLabel>
         <div className="mt-3 relative">
