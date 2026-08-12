@@ -2,7 +2,9 @@
 
 Ask your PostgreSQL database questions in plain English. An LLM writes the SQL — and the system treats that SQL as hostile input: it is parsed with PostgreSQL's own parser, checked against a safety allowlist, row-capped, and executed inside a read-only transaction with a statement timeout.
 
-**Phase 2 (current):** multi-user accounts (email/password + optional Google OAuth), per-user data-source isolation, Redis sessions with refresh-token rotation, sliding-window rate limits, and a semantic cache so paraphrased questions can reuse prior SQL without another LLM call.
+**Live:** [querylens-web-nu.vercel.app](https://querylens-web-nu.vercel.app) — frontend on Vercel, API in a Docker container on Render's free tier (the API sleeps after 15 minutes of inactivity; the first request after that can take 2–3 minutes to wake it).
+
+**Phase 2 (current):** multi-user accounts (email/password + optional Google OAuth), per-user data-source isolation, Redis sessions with refresh-token rotation, sliding-window rate limits, a semantic cache so paraphrased questions can reuse prior SQL without another LLM call, Dockerized services, and a production deployment on Render + Vercel.
 
 ```mermaid
 flowchart LR
@@ -156,15 +158,44 @@ Visitors can try QueryLens against the seeded demo database without an account a
 | `npm run seed:demo` | Reset + seed the demo customer DB |
 | `npm test` | sqlguard adversarial test suite |
 
+## Run with Docker
+
+The repo ships two multi-stage images plus a compose file — Postgres (Supabase) and Redis (Redis Cloud) stay external, so Docker only packages the app itself:
+
+- `apps/api/Dockerfile` — Node 22 slim; installs the API workspace, runs migrations, then starts the server.
+- `apps/web/Dockerfile` — builds the React app with Vite, then serves the static files with nginx (`apps/web/nginx.conf` handles SPA fallback and proxies `/api` to the API container).
+
+```bash
+docker compose up -d --build   # web on http://localhost, api internal on :4000
+docker compose logs -f         # watch both services
+docker compose down            # stop everything
+```
+
+The same `.env` file is injected via `env_file`; compose overrides `WEB_ORIGIN` / `GOOGLE_REDIRECT_URI` to the nginx origin (`http://localhost`).
+
+## Deployment (Render + Vercel)
+
+| Piece | Where | How |
+|---|---|---|
+| API | [Render](https://render.com) Web Service (free tier) | Builds `apps/api/Dockerfile` from the repo on every push to `main`; health check on `/api/health`; secrets live in Render env vars |
+| Web | [Vercel](https://vercel.com) (root directory `apps/web`) | Vite build from source; `apps/web/vercel.json` rewrites `/api/*` server-side to the Render URL and falls back to `index.html` for SPA routes |
+| Data | Supabase (Postgres) + Redis Cloud | unchanged from local dev |
+
+Because Vercel proxies `/api/*`, the browser only ever talks to the Vercel origin — auth cookies stay same-origin (`sameSite: 'lax'`) exactly as they do behind nginx locally. The API sets `trust proxy` so the demo rate limiter sees real client IPs behind Render's load balancer. Production `WEB_ORIGIN` and `GOOGLE_REDIRECT_URI` point at the Vercel domain (mirrored in the Google Cloud Console OAuth client).
+
+Free-tier caveat: Render spins the API down after ~15 minutes idle; the first request after that takes a couple of minutes (the landing page tells visitors this).
+
 ## Project layout
 
 ```text
+docker-compose.yml     local orchestration: nginx web + api
 apps/
 ├─ api/            Express 5, plain JS (ESM)
+│  ├─ Dockerfile       multi-stage: workspace deps → slim runtime (migrate + serve)
 │  └─ src/
 │     ├─ db/           pool, migrations (001–003), seed, repositories
 │     ├─ redis/        client, key registry, Lua sliding-window rate limiter
-│     ├─ routes/       health, auth, data-sources, ask/run
+│     ├─ routes/       health, auth, data-sources, ask/run, public demo
 │     ├─ middleware/   requireAuth, errorHandler
 │     ├─ services/
 │     │  ├─ auth/      JWT access tokens, refresh rotation, Google OAuth
@@ -174,9 +205,12 @@ apps/
 │     │  └─ sqlguard/  AST validation with libpg-query
 │     └─ lib/          AES-256-GCM credential encryption
 └─ web/            Vite + React 19, Tailwind 4, Recharts
+   ├─ Dockerfile       multi-stage: vite build → nginx static serve
+   ├─ nginx.conf       SPA fallback + /api proxy (local Docker)
+   ├─ vercel.json      /api rewrite to Render + SPA fallback (production)
    └─ src/
-      ├─ context/      AuthContext (access token in memory, refresh on load)
-      ├─ pages/        Login, Register, AuthCallback, Sources, AddSource, Ask
+      ├─ context/      AuthContext (access token in memory, refresh on load), ThemeContext
+      ├─ pages/        Landing, Login, Register, AuthCallback, Sources, AddSource, Ask
       └─ components/   SchemaSidebar, ResultTable, ResultChart, GoogleSignInButton
 ```
 
@@ -205,6 +239,44 @@ apps/
 - **Google OAuth**: authorization-code flow with Redis-backed CSRF `state`. The ID token is verified against Google's JWKS (`jose`); accounts link by verified email if one already exists. Same refresh-cookie session model as password login.
 - **Lockout**: 5 failed logins per email trigger a 15-minute lock (Redis counter with TTL). Google-only accounts (no password) get a clear error if password login is attempted.
 - **Isolation**: every data-source query is scoped by `user_id` in SQL, and semantic-cache lookups filter on the user id tag inside the vector search itself.
+
+## How Redis works in this project
+
+Redis is not "a cache" here — it does five structurally different jobs, each on a different data type. Everything ephemeral, high-churn, and latency-critical lives in Redis; everything durable lives in Postgres. All keys are defined in one registry (`apps/api/src/redis/keys.js`) so multi-tenant key-prefix bugs can't creep in, and all access goes through a single lazy client (`redis/client.js`) — one connection per process, with the *promise* cached so concurrent callers during startup share the same connect attempt.
+
+### 1. Refresh sessions — hash + set (`sess:refresh:*`, `sess:family:*`)
+
+Each refresh token is stored as a **hash** keyed by the token's sha256 (a Redis dump never yields usable tokens), holding `userId`, `familyId`, and metadata. Every hash ever issued in a login chain is also added to a **set** per rotation *family*. Both keys carry a 30-day TTL, so dead sessions clean themselves up — no cron job.
+
+The family set is what powers replay detection: a token that has no live hash but *is* in the family set was already used once — that's a stolen-cookie replay — and the whole family is revoked (`sessions.js`). Writes use `MULTI` so a crash can't leave a session key without its TTL.
+
+### 2. Login lockout — counter with TTL (`auth:loginfail:<email>`)
+
+Failed logins do `INCR` + `EXPIRE` in a `MULTI`; 5 failures lock the email for 15 minutes. Keyed by email (not IP) so credential stuffing against one account can't be laundered through a proxy pool. High-write disposable data — exactly what you don't want as Postgres rows.
+
+### 3. OAuth CSRF state — one-time value (`oauth:state:<state>`)
+
+Starting Google sign-in stores a random `state` with a 10-minute TTL. The callback consumes it with **`GETDEL`** — read and delete in one atomic command — so a state can never be used twice and a forged/replayed callback finds nothing.
+
+### 4. Rate limiting — sorted set + Lua (`rl:ask:<userId>`, `rl:demo:<ip>`)
+
+A true **sliding window** (no fixed-window boundary burst): each request is a ZSET member scored by timestamp. The Lua script (`redis/rateLimit.js`) evicts entries older than the window (`ZREMRANGEBYSCORE`), counts survivors (`ZCARD`), and either records the request (`ZADD` + `PEXPIRE`) or computes an exact retry-after from the oldest surviving entry.
+
+It's a Lua script because check-then-act across separate commands races — two concurrent requests could both read 19/20 and both be admitted. Redis executes the script atomically on its single thread, so the read-decide-write is indivisible (and one round-trip instead of four). Limits: 20 asks/min per user, 6/min per IP on the public demo.
+
+### 5. Semantic cache — hashes + vector index (`semcache:*`, `idx:semcache`)
+
+Question → SQL cache keyed by *meaning*, in two layers:
+
+1. **Exact layer:** normalized question is hashed; a direct hash lookup skips even the embedding call for repeats.
+2. **Vector layer:** the question is embedded (Gemini, 768-dim float32) and searched with `FT.SEARCH` KNN over an **HNSW** index (cosine distance). A hit within `SEMCACHE_MAX_DISTANCE` (default 0.1 ≈ 90% similarity) reuses the cached SQL and skips the LLM entirely.
+
+Two details do the heavy lifting:
+
+- **Tenant isolation inside the query:** every entry carries `user_id` and `schema_checksum` TAG fields, and the KNN search pre-filters on both — `(@user_id:{...} @schema_checksum:{...})=>[KNN 1 ...]`. Another user's cached SQL is never even a search candidate; isolation doesn't depend on application-side filtering.
+- **Automatic invalidation:** the checksum is a sha256 of the introspected schema. Any schema change flips the checksum and orphans every stale entry — cached SQL referencing a renamed column can never be served.
+
+Entries expire after 7 days, only *successfully executed* SQL is stored (never guard-rejected or failed queries), cached SQL is still re-validated by sqlguard on every hit, and the whole cache fails open: if Redis is down or the deployment lacks the query engine (`FT.*`), lookups return null / degrade to exact-match and the ask flow continues without caching.
 
 ## Roadmap (phase 3)
 
