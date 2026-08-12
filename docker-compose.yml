@@ -1,0 +1,42 @@
+# QueryLens — local Docker stack
+#
+# What runs here:
+#   web  → nginx serving the built React app + proxying /api → api
+#   api  → Express (talks to your existing Supabase + Redis Cloud)
+#
+# Postgres and Redis stay outside Docker on purpose: you already have them
+# (Supabase + Redis Cloud). Docker only packages the app you wrote.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Inside Docker the browser hits nginx on :80, so OAuth / CORS origins
+      # must match that — not the old Vite :5173 / API :4000 ports.
+      PORT: "4000"
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost/api/auth/google/callback}
+      NODE_ENV: production
+    expose:
+      - "4000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
